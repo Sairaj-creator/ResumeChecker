@@ -1,3 +1,4 @@
+import html
 import logging
 import os
 import tempfile
@@ -46,6 +47,7 @@ app = FastAPI(title="KeyResume API", version="2.2.1")
 
 
 def _resolve_cors_origins() -> list[str]:
+    raw = os.getenv("CORS_ORIGINS", "").strip()
     if not raw:
         return [
             "http://localhost:5173",
@@ -83,6 +85,7 @@ def _extract_pdf_text(upload_file: UploadFile) -> str:
     upload_file.file.seek(0)
     raw = upload_file.file.read()
 
+    # Fallback size check for cases where upload_file.size is None
     if len(raw) > MAX_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(
             status_code=413,
@@ -174,15 +177,15 @@ def _fallback_roast_and_advice(score: int, missing_skills: list[str]) -> str:
 
 def _fallback_html_resume(text: str) -> str:
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    name = lines[0] if lines else "Your Name"
-    summary = " ".join(lines[1:4]) if len(lines) > 1 else "Experienced professional focused on measurable outcomes."
+    name = html.escape(lines[0]) if lines else "Your Name"
+    summary = html.escape(" ".join(lines[1:4])) if len(lines) > 1 else "Experienced professional focused on measurable outcomes."
     bullets = lines[4:10] if len(lines) > 4 else [
         "Delivered customer-facing features with measurable quality gains.",
         "Improved workflow efficiency by automating repetitive tasks.",
         "Collaborated cross-functionally to ship reliable releases on time.",
     ]
 
-    bullets_html = "".join(f"<li>{item}</li>" for item in bullets[:5])
+    bullets_html = "".join(f"<li>{html.escape(item)}</li>" for item in bullets[:5])
     return f"""
 <style>
   body {{ font-family: 'Lora', Georgia, serif; color: #1a1a1a; line-height: 1.6; margin: 0; }}
@@ -447,8 +450,6 @@ async def get_rewrites_for_analysis(analysis_id: int, db: Session = Depends(get_
         logger.exception("Failed to fetch rewrites history: %s", exc)
         raise HTTPException(status_code=503, detail="Database unavailable.")
 
-    if not rewrites:
-        pass # Return empty list instead of 404
 
     return {
         "analysis_id": analysis_id,
