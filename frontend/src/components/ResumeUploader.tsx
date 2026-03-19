@@ -33,7 +33,15 @@ export function ResumeUploader({
     <section className="card uploader-card">
       <div
         className={`dropzone ${isDragOver ? 'drag-over' : ''}`}
+        role="button"
+        tabIndex={0}
         onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
         onDragOver={(event) => {
           event.preventDefault();
           setIsDragOver(true);

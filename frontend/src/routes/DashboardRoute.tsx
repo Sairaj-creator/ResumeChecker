@@ -37,7 +37,7 @@ export function DashboardRoute() {
     try {
       const [analysisPayload, rewritePayload] = await Promise.all([
         getAnalysisById(parsedId),
-        getRewritesForAnalysis(parsedId).catch(() => ({ analysis_id: parsedId, count: 0, rewrites: [] })),
+        getRewritesForAnalysis(parsedId),
       ]);
 
       const feedback = analysisPayload.feedback_data || {};

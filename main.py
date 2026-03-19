@@ -46,14 +46,15 @@ app = FastAPI(title="KeyResume API", version="2.2.1")
 
 
 def _resolve_cors_origins() -> list[str]:
-    raw = os.getenv("CORS_ORIGINS", "").strip()
-    if not raw or raw == "*":
+    if not raw:
         return [
             "http://localhost:5173",
             "http://127.0.0.1:5173",
             "http://localhost:4173",
             "http://127.0.0.1:4173",
         ]
+    if raw == "*":
+        return ["*"]
     return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
 
@@ -73,15 +74,21 @@ def _extract_pdf_text(upload_file: UploadFile) -> str:
     if not upload_file.filename or not upload_file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Please upload a PDF file.")
 
+    if upload_file.size is not None and upload_file.size > MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File is too large. Maximum allowed size is {MAX_UPLOAD_MB}MB.",
+        )
+
+    upload_file.file.seek(0)
     raw = upload_file.file.read()
-    if not raw:
-        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
     if len(raw) > MAX_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(
             status_code=413,
             detail=f"File is too large. Maximum allowed size is {MAX_UPLOAD_MB}MB.",
         )
+
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         tmp.write(raw)
@@ -441,7 +448,7 @@ async def get_rewrites_for_analysis(analysis_id: int, db: Session = Depends(get_
         raise HTTPException(status_code=503, detail="Database unavailable.")
 
     if not rewrites:
-        raise HTTPException(status_code=404, detail="No rewrites found for this analysis ID.")
+        pass # Return empty list instead of 404
 
     return {
         "analysis_id": analysis_id,
@@ -458,42 +465,6 @@ async def get_rewrites_for_analysis(analysis_id: int, db: Session = Depends(get_
     }
 
 
-@app.get("/history/rewrites/{analysis_id}/download/{rewrite_id}")
-async def download_specific_rewrite(
-    analysis_id: int,
-    rewrite_id: int,
-    db: Session = Depends(get_db),
-) -> dict:
-    try:
-        rewrite = (
-            db.query(ResumeRewrite)
-            .filter(
-                ResumeRewrite.id == rewrite_id,
-                ResumeRewrite.analysis_id == analysis_id,
-            )
-            .first()
-        )
-    except SQLAlchemyError as exc:
-        logger.exception("Failed to fetch rewrite payload: %s", exc)
-        raise HTTPException(status_code=503, detail="Database unavailable.")
-
-    if not rewrite:
-        raise HTTPException(status_code=404, detail="Rewrite not found.")
-
-    try:
-        analysis = db.query(ResumeAnalysis).filter(ResumeAnalysis.id == analysis_id).first()
-    except SQLAlchemyError as exc:
-        logger.exception("Failed to fetch analysis for rewrite payload: %s", exc)
-        raise HTTPException(status_code=503, detail="Database unavailable.")
-
-    return {
-        "id": rewrite.id,
-        "analysis_id": rewrite.analysis_id,
-        "style": rewrite.target_style,
-        "created_at": rewrite.created_at,
-        "html_content": rewrite.html_content,
-        "original_text": analysis.raw_text if analysis else None,
-    }
 
 
 @app.post("/rewrite/from-analysis/{analysis_id}")

@@ -10,8 +10,8 @@ export function parseFeedback(raw: string): ParsedFeedback {
   if (parts.length > 1) {
     roast = parts[0].replace(/\[ROAST\]|ROAST:/i, '').trim() || roast;
     advice = parts[1]
-      .split(/\n|>|-|\*|\d+\./g)
-      .map((item) => item.trim())
+      .split('\n')
+      .map((line) => line.replace(/^[>*\-]\s*|\d+\.\s*/, '').trim())
       .filter((item) => item.length > 8)
       .slice(0, 6);
   } else {

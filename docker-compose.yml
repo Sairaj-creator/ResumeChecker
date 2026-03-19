@@ -13,6 +13,8 @@ services:
       HF_TOKEN: ${HF_TOKEN}
       HF_MODEL_ID: ${HF_MODEL_ID}
       CORS_ORIGINS: ${CORS_ORIGINS}
+    command: >
+      bash -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"
     depends_on:
       db:
         condition: service_healthy
